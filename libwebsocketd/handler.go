@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -63,22 +64,53 @@ func (wsh *WebsocketdHandler) accept(ws *websocket.Conn, log *LogScope) {
 	log.Access("session", "CONNECT")
 	defer log.Access("session", "DISCONNECT")
 
-	launched, err := launchCmd(wsh.command, wsh.server.Config.CommandArgs, wsh.Env)
-	if err != nil {
-		log.Error("process", "Could not launch process %s %s (%s)", wsh.command, strings.Join(wsh.server.Config.CommandArgs, " "), err)
-		return
-	}
-
-	log.Associate("pid", strconv.Itoa(launched.cmd.Process.Pid))
-
 	binary := wsh.server.Config.Binary
-	process := NewProcessEndpoint(launched, binary, log)
-	if cms := wsh.server.Config.CloseMs; cms != 0 {
-		process.closetime += time.Duration(cms) * time.Millisecond
-	}
+
 	wsEndpoint := NewWebSocketEndpoint(ws, binary, log)
 
-	PipeEndpoints(process, wsEndpoint)
+	if wsh.server.Config.UnixSocket {
+		cmd := exec.Command(wsh.command, wsh.server.Config.CommandArgs...)
+		cmd.Env = wsh.Env
+
+		if err := cmd.Start(); err != nil {
+			log.Error("process", "Could not launch process %s %s (%s)", wsh.command, strings.Join(wsh.server.Config.CommandArgs, " "), err)
+			return
+		}
+
+		wsh.server.unixSocketListener.SetDeadline(time.Now().Add(10*time.Second))
+		conn, err := wsh.server.unixSocketListener.AcceptUnix()
+
+		if err != nil {
+			log.Error("process", "accept error: %s", err)
+			return
+		}
+
+		log.Associate("pid", strconv.Itoa(cmd.Process.Pid))
+
+		procEndpoint := NewDomainEndpoint(cmd, conn, log)
+
+		if cms := wsh.server.Config.CloseMs; cms != 0 {
+			procEndpoint.closetime += time.Duration(cms) * time.Millisecond
+		}
+
+		PipeEndpoints(procEndpoint, wsEndpoint)
+	} else {
+		launched, err := launchCmd(wsh.command, wsh.server.Config.CommandArgs, wsh.Env)
+		if err != nil {
+			log.Error("process", "Could not launch process %s %s (%s)", wsh.command, strings.Join(wsh.server.Config.CommandArgs, " "), err)
+			return
+		}
+
+		log.Associate("pid", strconv.Itoa(launched.cmd.Process.Pid))
+
+		procEndpoint := NewProcessEndpoint(launched, binary, log)
+
+		if cms := wsh.server.Config.CloseMs; cms != 0 {
+			procEndpoint.closetime += time.Duration(cms) * time.Millisecond
+		}
+
+		PipeEndpoints(procEndpoint, wsEndpoint)
+	}
 }
 
 // RemoteInfo holds information about remote http client

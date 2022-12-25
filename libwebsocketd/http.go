@@ -26,6 +26,7 @@ var ForkNotAllowedError = errors.New("too many forks active")
 
 // WebsocketdServer presents http.Handler interface for requests libwebsocketd is handling.
 type WebsocketdServer struct {
+	unixSocketListener *net.UnixListener
 	Config *Config
 	Log    *LogScope
 	forks  chan byte
@@ -40,7 +41,20 @@ func NewWebsocketdServer(config *Config, log *LogScope, maxforks int) *Websocket
 	if maxforks > 0 {
 		mux.forks = make(chan byte, maxforks)
 	}
+
 	return mux
+}
+
+func (h *WebsocketdServer) ListenUnix(address string) error {
+	listener, err := net.ListenUnix("unixpacket",  &net.UnixAddr{address, "unixpacket"})
+	h.unixSocketListener = listener
+	return err
+}
+
+func (h *WebsocketdServer) Clean() {
+	if h.Config.UnixSocket {
+		h.unixSocketListener.Close()
+	}
 }
 
 func splitMimeHeader(s string) (string, string) {

@@ -19,11 +19,11 @@ import (
 )
 
 type Config struct {
-	Addr              []string // TCP addresses to listen on. e.g. ":1234", "1.2.3.4:1234" or "[::1]:1234"
-	MaxForks          int      // Number of allowable concurrent forks
-	LogLevel          libwebsocketd.LogLevel
-	RedirPort         int
-	CertFile, KeyFile string
+	Addr              			[]string // TCP addresses to listen on. e.g. ":1234", "1.2.3.4:1234" or "[::1]:1234"
+	MaxForks          			int      // Number of allowable concurrent forks
+	LogLevel          			libwebsocketd.LogLevel
+	RedirPort         			int
+	CertFile, KeyFile, SockFile string
 	*libwebsocketd.Config
 }
 
@@ -74,6 +74,7 @@ func parseCommandLine() *Config {
 	maxForksFlag := flag.Int("maxforks", 0, "Max forks, zero means unlimited")
 	closeMsFlag := flag.Uint("closems", 0, "Time to start sending signals (0 never)")
 	redirPortFlag := flag.Int("redirport", 0, "HTTP port to redirect to canonical --port address")
+	unixSocketDir := flag.String("socketdir", "", "The path to create the domain socket when --unixsocket is used")
 
 	// lib config options
 	binaryFlag := flag.Bool("binary", false, "Set websocketd to experimental binary mode (default is line by line)")
@@ -85,6 +86,7 @@ func parseCommandLine() *Config {
 	passEnvFlag := flag.String("passenv", defaultPassEnv[runtime.GOOS], "List of envvars to pass to subprocesses (others will be cleaned out)")
 	sameOriginFlag := flag.Bool("sameorigin", false, "Restrict upgrades if origin and host headers differ")
 	allowOriginsFlag := flag.String("origin", "", "Restrict upgrades if origin does not match the list")
+	unixSocketFlag := flag.Bool("unixsocket", false, "Use unix socket for IPC")
 
 	headers := Arglist(make([]string, 0))
 	headersWs := Arglist(make([]string, 0))
@@ -134,6 +136,7 @@ func parseCommandLine() *Config {
 	config.HeadersWs = []string(headersWs)
 	config.HeadersHTTP = []string(headersHttp)
 
+	config.UnixSocket = *unixSocketFlag
 	config.CloseMs = *closeMsFlag
 	config.Binary = *binaryFlag
 	config.ReverseLookup = *reverseLookupFlag
@@ -162,6 +165,16 @@ func parseCommandLine() *Config {
 		fmt.Printf("%s\n", libwebsocketd.License)
 		os.Exit(0)
 	}
+
+	// Reading unix socket options
+	if config.UnixSocket {
+		if *unixSocketDir == "" {
+			fmt.Fprintf(os.Stderr, "Please specify --socketdir when requesting --unixsocket.\n")
+			os.Exit(1)
+		}
+	}
+
+	mainConfig.SockFile = *unixSocketDir
 
 	// Reading SSL options
 	if config.Ssl {

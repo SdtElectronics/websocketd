@@ -30,6 +30,7 @@ type Config struct {
 	DevConsole     bool     // Enable dev console. This disables StaticDir and CgiDir.
 	AllowOrigins   []string // List of allowed origin addresses for websocket upgrade.
 	SameOrigin     bool     // If set, requires websocket upgrades to be performed from same origin only.
+	UnixSocket	   bool		// If set, use unix socket for IPC
 	Headers        []string
 	HeadersWs      []string
 	HeadersHTTP    []string

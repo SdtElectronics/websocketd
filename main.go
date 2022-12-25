@@ -9,9 +9,12 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/joewalnes/websocketd/libwebsocketd"
 )
@@ -55,6 +58,34 @@ func main() {
 		os.Clearenv() // it's ok to wipe it clean, we already read env variables from passenv into config
 	}
 	handler := libwebsocketd.NewWebsocketdServer(config.Config, log, config.MaxForks)
+	
+	if config.Config.UnixSocket {
+		if err := os.MkdirAll(filepath.Dir(config.SockFile), os.ModePerm); err != nil {
+			log.Fatal("server", "Failed creating directories to the socket: %s", err)
+			os.Exit(3)
+		}
+
+		if err := handler.ListenUnix(config.SockFile); err != nil {
+			log.Fatal("server", "Failed listening to the socket: %s", err)
+			os.Exit(3)
+		}
+	}
+
+	defer handler.Clean()
+
+	// Handle common process-killing signals so we can gracefully shut down:
+	sigc := make(chan os.Signal, 1)
+	signal.Notify(sigc, os.Interrupt, os.Kill, syscall.SIGTERM)
+	go func(c chan os.Signal) {
+		// Wait for a SIGINT or SIGKILL:
+		sig := <-c
+		log.Info("server", "Caught signal %s: shutting down.", sig)
+		// Stop listening (and unlink the socket if unix type):
+		handler.Clean()
+		// And we're done:
+		os.Exit(0)
+	}(sigc)
+
 	http.Handle("/", handler)
 
 	if config.UsingScriptDir {
