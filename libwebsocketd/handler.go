@@ -34,7 +34,7 @@ func NewWebsocketdHandler(s *WebsocketdServer, req *http.Request, log *LogScope)
 	wsh = &WebsocketdHandler{server: s, Id: generateId()}
 	log.Associate("id", wsh.Id)
 
-	wsh.RemoteInfo, err = GetRemoteInfo(req.RemoteAddr, s.Config.ReverseLookup)
+	wsh.RemoteInfo, err = GetRemoteInfo(req, s.Config)
 	if err != nil {
 		log.Error("session", "Could not understand remote address '%s': %s", req.RemoteAddr, err)
 		return nil, err
@@ -119,14 +119,18 @@ type RemoteInfo struct {
 }
 
 // GetRemoteInfo creates RemoteInfo structure and fills its fields appropriately
-func GetRemoteInfo(remote string, doLookup bool) (*RemoteInfo, error) {
-	addr, port, err := net.SplitHostPort(remote)
+func GetRemoteInfo(req *http.Request, config *Config) (*RemoteInfo, error) {
+	addr, port, err := net.SplitHostPort(req.RemoteAddr)
 	if err != nil {
 		return nil, err
 	}
 
+	if config.RemoteHeader != "" {
+		addr = req.Header.Get(config.RemoteHeader)
+	}
+
 	var host string
-	if doLookup {
+	if config.ReverseLookup {
 		hosts, err := net.LookupAddr(addr)
 		if err != nil || len(hosts) == 0 {
 			host = addr

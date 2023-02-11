@@ -87,6 +87,7 @@ func parseCommandLine() *Config {
 	sameOriginFlag := flag.Bool("sameorigin", false, "Restrict upgrades if origin and host headers differ")
 	allowOriginsFlag := flag.String("origin", "", "Restrict upgrades if origin does not match the list")
 	unixSocketFlag := flag.Bool("unixsocket", false, "Use unix socket for IPC")
+	remoteHeader := flag.String("remoteheader", "", "Use unix socket for IPC")
 
 	headers := Arglist(make([]string, 0))
 	headersWs := Arglist(make([]string, 0))
@@ -136,6 +137,7 @@ func parseCommandLine() *Config {
 	config.HeadersWs = []string(headersWs)
 	config.HeadersHTTP = []string(headersHttp)
 
+	config.RemoteHeader = *remoteHeader
 	config.UnixSocket = *unixSocketFlag
 	config.CloseMs = *closeMsFlag
 	config.Binary = *binaryFlag

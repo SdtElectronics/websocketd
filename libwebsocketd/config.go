@@ -25,6 +25,7 @@ type Config struct {
 	Ssl            bool     // websocketd works with --ssl which means TLS is in use
 	ScriptDir      string   // Base directory for websocket scripts.
 	UsingScriptDir bool     // Are we running with a script dir.
+	RemoteHeader   string   // If set, remote address will be get from this field of request headers.
 	StaticDir      string   // If set, static files will be served from this dir over HTTP.
 	CgiDir         string   // If set, CGI scripts will be served from this dir over HTTP.
 	DevConsole     bool     // Enable dev console. This disables StaticDir and CgiDir.

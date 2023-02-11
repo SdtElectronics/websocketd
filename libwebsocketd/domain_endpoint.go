@@ -118,8 +118,8 @@ func (de *DomainEndpoint) readPkt() {
 			}
 			break
 		}
-		// de.output <- append(make([]byte, 0, n), buf[:n]...) // cloned buffer
-		de.output <- buf[:n]
+		de.output <- append(make([]byte, 0, n), buf[:n]...) // cloned buffer
+		// de.output <- buf[:n]
 	}
 	close(de.output)
 }
